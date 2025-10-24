@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Polyphase — Obfuscated Multi-Tech Demo</title>
+    <style>
+        /* ============================
+   Visual + CSS complexity layer
+   ============================ */
+
+        /* global reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        }
+
+        :root {
+            --bg: #0b0f17;
+            --glow: #5eead4;
+            --accent: #60a5fa;
+            --panel: rgba(255, 255, 255, 0.03);
+            --glass: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+            --noise: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="%23000"/><circle cx="2" cy="2" r="1" fill="%231111"/></svg>');
+        }
+
+        /* layered grid layout that looks like many panels */
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(ellipse at 20% 10%, rgba(96, 165, 250, 0.06) 0%, transparent 15%),
+                radial-gradient(ellipse at 80% 90%, rgba(94, 234, 212, 0.04) 0%, transparent 18%),
+                var(--bg);
+            color: #cde6ff;
+            overflow: hidden;
+        }
+
+        /* visually complex header */
+        .header {
+            position: fixed;
+            left: 1rem;
+            top: 1rem;
+            z-index: 999;
+            background: var(--panel);
+            padding: 0.6rem 0.9rem;
+            border-radius: 12px;
+            box-shadow: 0 6px 30px rgba(2, 6, 23, 0.6), 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(6px) saturate(1.2);
+            display: flex;
+            gap: 0.6rem;
+            align-items: center;
+        }
+
+        .brand {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            overflow: hidden;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #111827, #0f172a);
+            box-shadow: 0 4px 18px rgba(2, 6, 23, 0.6);
+        }
+
+        .brand svg {
+            width: 40px;
+            height: 40px;
+            display: block;
+            transform: rotate(12deg);
+            opacity: 0.95;
+            mix-blend-mode: screen
+        }
+
+        .title {
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            font-size: 14px;
+        }
+
+        .sub {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+
+        .side-panels {
+            position: fixed;
+            right: 1rem;
+            top: 1rem;
+            display: flex;
+            gap: 12px;
+            z-index: 900;
+        }
+
+        .panel {
+            width: 240px;
+            height: 120px;
+            border-radius: 10px;
+            padding: 10px;
+            background: var(--glass);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            box-shadow: 0 14px 30px rgba(2, 6, 23, 0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            font-family: "Courier New", monospace;
+            font-size: 12px;
+            color: #d6eaff;
+        }
+
+        /* two big canvases stacked with blend modes */
+        .stage {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            pointer-events: none;
+        }
+
+        canvas {
+            max-width: 90vw;
+            max-height: 80vh;
+            width: calc(70vw);
+            height: calc(58vh);
+            border-radius: 16px;
+            box-shadow: 0 30px 80px rgba(3, 7, 18, 0.7), 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            background: linear-gradient(180deg, rgba(10, 12, 16, 0.4), rgba(0, 0, 0, 0.2));
+        }
+
+        /* layered small debug console hidden by default but accessible via secret hotkey */
+        #dbg {
+            position: fixed;
+            left: 1rem;
+            bottom: 1rem;
+            width: 360px;
+            max-height: 44vh;
+            overflow: auto;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+            z-index: 9999;
+        }
+
+        /* animated SVG watermark */
+        .watermark {
+            position: fixed;
+            left: 50%;
+            top: 92%;
+            transform: translateX(-50%);
+            z-index: 800;
+            pointer-events: none;
+            opacity: 0.06;
+            font-weight: 700;
+            letter-spacing: 8px;
+            font-size: 40px;
+            text-transform: uppercase;
+            filter: blur(0.6px);
+        }
+
+        /* CSS pseudo-element chaos for added confusion */
+        .header::after {
+            content: "";
+            position: absolute;
+            left: -40px;
+            top: -40px;
+            width: 120px;
+            height: 120px;
+            background: conic-gradient(from 110deg at 50% 50%, rgba(96, 165, 250, 0.06), transparent 35%);
+            transform: rotate(12deg);
+            z-index: -1;
+            border-radius: 40px;
+        }
+
+        /* responsive shrink */
+        @media (max-width:900px) {
+            .side-panels {
+                display: none;
+            }
+
+            canvas {
+                width: 92vw;
+                height: 60vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header" id="hdr">
+        <div class="brand" aria-hidden="true">
+            <!-- small decorative SVG -->
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="4" y="4" width="56" height="56" rx="12" fill="#0f172a" />
+                <g opacity="0.95" transform="translate(8,8)">
+                    <path d="M8 4c8-6 24 6 32 0 8-6 8 8 0 12-8 4-24-6-32-2C0 18 0 10 8 4z" fill="#60a5fa" />
+                </g>
+            </svg>
+        </div>
+        <div>
+            <div class="title">Polyphase • MultiLayer Demo</div>
+            <div class="sub">complexity: high · author: unknown</div>
+        </div>
+    </div>
+
+    <div class="side-panels" aria-hidden="true">
+        <div class="panel" id="p1"></div>
+        <div class="panel" id="p2"></div>
+    </div>
+
+    <div class="stage" aria-hidden="false">
+        <canvas id="c2"></canvas> <!-- WebGL shader layer -->
+        <canvas id="c1"></canvas> <!-- 2D procedural layer -->
+    </div>
+
+    <div id="dbg" aria-hidden="true"></div>
+
+    <div class="watermark">Polyphase</div>
+
+    <script>
+        /*
+  ============================
+  Polyphase — MultiTech Obfuscated Demo
+  ============================
+  The runtime below intentionally mixes:
+  - WebGL fragment shader for hypnotic visuals
+  - 2D canvas procedural drawing (perlin-like noise)
+  - WebAudio generative sound
+  - WebWorker (created from a Blob) which runs encoded logic
+  - Proxy/meta-programming for confusing control flow
+  - base64-encoded, self-evaluated snippets
+  - tiny IndexedDB usage (demo)
+  - a secret debug console unlocked by pressing "P,O,L,Y" in sequence
+
+  If you want to understand parts, search for the commented labels.
+*/
+
+        /* -------------------------
+           tiny helpers / obfuscation
+           ------------------------- */
+        const _ = (...a) => a.map(x => x?.toString?.()).join('');
+        const enc = (s) => btoa(unescape(encodeURIComponent(s)));
+        const dec = (s) => decodeURIComponent(escape(atob(s)));
+        const rand = (n = 1) => Math.random() * n;
+        const now = () => performance.now();
+        const Z = Symbol('z'); // used to hide values in a Proxy
+
+        /* --------- secret input sequence unlock debug ------------- */
+        const secret = ['p', 'o', 'l', 'y'];
+        let _si = 0;
+        window.addEventListener('keydown', e => {
+            if (e.key && e.key.toLowerCase() === secret[_si]) _si++;
+            else _si = 0;
+            if (_si === secret.length) {
+                const d = document.getElementById('dbg');
+                d.style.display = 'block';
+                log('dbg', 'Secret console unlocked — have fun');
+            }
+        });
+
+        /* --------------------------
+           Panel text + runtime log
+           -------------------------- */
+        function log(id, ...txt) {
+            try {
+                const p = document.getElementById(id || 'p1');
+                if (p) {
+                    p.textContent = (p.textContent ? p.textContent + '\n' : '') + txt.join(' ');
+                    p.scrollTop = p.scrollHeight;
+                }
+                const dbg = document.getElementById('dbg');
+                if (dbg) {
+                    dbg.textContent = (dbg.textContent ? dbg.textContent + '\n' : '') + '[' + new Date().toLocaleTimeString() + '] ' + txt.join(' ');
+                    dbg.scrollTop = dbg.scrollHeight;
+                }
+            } catch (e) {}
+        }
+
+        /* ---------------------------------
+           Canvas 1: 2D procedural noisy flow
+           --------------------------------- */
+        const canvas2d = document.getElementById('c1');
+        const ctx = canvas2d.getContext('2d');
+
+        function fitCanvas() {
+            const w = Math.min(window.innerWidth * 0.9, 1400);
+            const h = Math.min(window.innerHeight * 0.78, 900);
+            [canvas2d.width, canvas2d.height] = [Math.floor(w), Math.floor(h)];
+            const c2 = document.getElementById('c2');
+            c2.width = canvas2d.width;
+            c2.height = canvas2d.height;
+        }
+        fitCanvas();
+        window.addEventListener('resize', () => {
+            fitCanvas();
+        });
+
+        /* Simple value-noise (not true Perlin) */
+        function makeNoise(w, h, seed) {
+            const r = new Math.seedrandom ? new Math.seedrandom(seed) : Math.random;
+            const g = new Float32Array(w * h);
+            for (let i = 0; i < w * h; i++) g[i] = Math.sin((i * 374761393 + seed) * 0.0000001 + Math.random()) * 0.5 + 0.5;
+            return {
+                w,
+                h,
+                g
+            };
+        }
+
+        function sampleNoise(noise, x, y) {
+            const xi = Math.max(0, Math.min(noise.w - 1, Math.floor(x)));
+            const yi = Math.max(0, Math.min(noise.h - 1, Math.floor(y)));
+            return noise.g[yi * noise.w + xi];
+        }
+
+        /* draw flow using many layers, transparencies, and blend modes */
+        let _seed = Math.floor(Math.random() * 999999);
+        let noiseCache = makeNoise(canvas2d.width, canvas2d.height, _seed);
+        let t0 = now();
+
+        function draw2D(t) {
+            const w = canvas2d.width,
+                h = canvas2d.height;
+            // subtle background
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = 'rgba(6,8,12,0.26)';
+            ctx.fillRect(0, 0, w, h);
+
+            // multi-layered strokes
+            const layers = 12;
+            for (let L = 0; L < layers; L++) {
+                ctx.save();
+                const alpha = 0.04 + (L / layers) * 0.06;
+                ctx.globalAlpha = alpha;
+                ctx.globalCompositeOperation = (L % 2 === 0) ? 'lighter' : 'overlay';
+                ctx.beginPath();
+                for (let i = 0; i < 300; i++) {
+                    const u = i / 300;
+                    const x = (u * w) | 0;
+                    // sample pseudo noise
+                    const nx = (x * 0.003 + t * 0.00007 * (1 + L * 0.1));
+                    const y = (h * 0.5) + Math.sin(u * 12 + t * 0.0005 * (L + 1)) * (40 + 80 * Math.sin(L + 0.7)) + (sampleNoise(noiseCache, nx * noiseCache.w, (u * noiseCache.h)) - 0.5) * 120;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                const g = ctx.createLinearGradient(0, 0, w, h);
+                g.addColorStop(0, `hsla(${(t*0.02+L*20)%360},70%,60%,0.9)`);
+                g.addColorStop(1, `hsla(${(t*0.02+L*40)%360},50%,45%,0.9)`);
+                ctx.strokeStyle = g;
+                ctx.lineWidth = 0.6 + L * 0.6;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // speckles
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            for (let i = 0; i < 300; i++) {
+                const x = Math.random() * w;
+                const y = Math.random() * h;
+                const r = Math.random() * 1.6;
+                ctx.fillStyle = `rgba(255,255,255,${0.02+Math.random()*0.06})`;
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        /* ------------------------------
+           Canvas 2: WebGL fragment shader
+           ------------------------------ */
+        const canvasGL = document.getElementById('c2');
+        const gl = canvasGL.getContext('webgl', {
+            alpha: true,
+            antialias: true
+        });
+
+        const frag = `
+precision mediump float;
+uniform vec2 u_res;
+uniform float u_t;
+varying vec2 v_uv;
+
+/* complex layering of sines and shapes to confuse reader */
+float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123); }
+float noise(vec2 p){
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0,0.0));
+  float c = hash(i + vec2(0.0,1.0));
+  float d = hash(i + vec2(1.0,1.0));
+  vec2 u = f*f*(3.0-2.0*f);
+  return mix(a,b,u.x) + (c-a)*u.y*(1.0-u.x) + (d-b)*u.x*u.y;
+}
+
+void main(){
+  vec2 uv = (v_uv - 0.5) * vec2(u_res.x/u_res.y,1.0);
+  float t = u_t * 0.001;
+  float n = 0.0;
+  float amp = 1.0;
+  vec2 p = uv*2.0;
+  for(int i=0;i<5;i++){
+    n += amp * noise(p* (1.0+float(i)*0.4) + t*0.3);
+    amp *= 0.5;
+    p *= 1.9;
+  }
+  float rings = sin(12.0*length(uv) - t*2.0 + n*6.0);
+  vec3 col = vec3(0.1) + 0.6*vec3( sin(2.1 + n*2.6 + t*0.4), cos(1.3 + n*1.9 - t*0.2), sin(0.4 + n*1.2 + t*0.8) );
+  col *= 0.7 + 0.5*smoothstep(-0.3,0.4,rings);
+  // vignette & subtle flicker
+  float v = smoothstep(0.9,0.2,length(uv));
+  gl_FragColor = vec4(col * v, 0.85);
+}
+`;
+
+        /* gl setup helpers */
+        function mkShader(src, type) {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, src);
+            gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+                console.warn(gl.getShaderInfoLog(s));
+                return null;
+            }
+            return s;
+        }
+
+        function mkProg(vs, fs) {
+            const p = gl.createProgram();
+            gl.attachShader(p, vs);
+            gl.attachShader(p, fs);
+            gl.linkProgram(p);
+            if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+                console.warn(gl.getProgramInfoLog(p));
+                return null;
+            }
+            return p;
+        }
+
+        /* tiny vertex shader */
+        const vert = `
+attribute vec2 a_pos;
+varying vec2 v_uv;
+void main(){ v_uv = (a_pos+1.0)*0.5; gl_Position = vec4(a_pos,0.0,1.0); }
+`;
+
+        const vs = mkShader(vert, gl.VERTEX_SHADER);
+        const fs = mkShader(frag, gl.FRAGMENT_SHADER);
+        const prog = mkProg(vs, fs);
+        gl.useProgram(prog);
+        const a_pos = gl.getAttribLocation(prog, 'a_pos');
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(a_pos);
+        gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
+        const u_res = gl.getUniformLocation(prog, 'u_res');
+        const u_t = gl.getUniformLocation(prog, 'u_t');
+
+        /* -------------------------
+           WebAudio generative sound
+           ------------------------- */
+        let audioCtx, master;
+
+        function startAudio() {
+            try {
+                audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                master = audioCtx.createGain();
+                master.gain.value = 0.06;
+                master.connect(audioCtx.destination);
+
+                // create several oscillators with slowly changing detune
+                const oscCount = 4;
+                const oscs = [];
+                for (let i = 0; i < oscCount; i++) {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.type = ['sine', 'sawtooth', 'triangle', 'square'][i % 4];
+                    o.frequency.value = 110 * Math.pow(1.12246, i * 2);
+                    g.gain.value = 0.12 / (i + 1);
+                    o.connect(g);
+                    g.connect(master);
+                    o.start();
+                    oscs.push({
+                        o,
+                        g
+                    });
+                }
+                // slow LFO on master gain
+                const lfo = audioCtx.createOscillator();
+                lfo.frequency.value = 0.08;
+                const lfg = audioCtx.createGain();
+                lfg.gain.value = 0.02;
+                lfo.connect(lfg);
+                lfg.connect(master.gain);
+                lfo.start();
+
+                // return a control handle
+                return {
+                    oscs,
+                    lfo,
+                    lfg
+                };
+            } catch (e) {
+                log('p2', 'Audio failed: ' + e.message);
+                return null;
+            }
+        }
+
+        /* -----------------------------
+           WebWorker created from Blob
+           ----------------------------- */
+        const workerCode = (function() {
+            /*
+              // inside worker: perform "heavy" obfuscated math and post simple arrays
+              self.addEventListener('message', function(ev){
+                if(ev.data === 'start'){
+                  // pseudo heavy loop
+                  const out = new Float32Array(512);
+                  for(let i=0;i<out.length;i++){
+                    let x = i*0.001;
+                    // chaotic formula
+                    out[i] = Math.sin(x*13.37 + Math.cos(x*7.13)*Math.sqrt(x+1.0));
+                  }
+                  self.postMessage({type:'done', payload: out.buffer}, [out.buffer]);
+                }
+              });
+            */
+        }).toString().split('\n').slice(1, -1).join('\n');
+
+        const wk = new Worker(URL.createObjectURL(new Blob([workerCode], {
+            type: 'application/javascript'
+        })));
+        wk.addEventListener('message', function(ev) {
+            if (ev.data && ev.data.type === 'done') {
+                // reconstruct Float32Array
+                const arr = new Float32Array(ev.data.payload);
+                // use it to seed noise
+                for (let i = 0; i < 6; i++) {
+                    noiseCache.g[i] = noiseCache.g[i] * (0.8 + arr[i % arr.length] * 0.02);
+                }
+                log('p2', 'Worker returned payload; integrated into noise cache.');
+            }
+        });
+        wk.postMessage('start');
+
+        /* ------------------------------
+           Proxy + meta-programming misdirection
+           ------------------------------ */
+        /* wrap console.log so printed strings are slightly mutated (adds to obfuscation) */
+        const consoleProxy = new Proxy(console, {
+            get(target, prop, rec) {
+                if (prop === 'log') {
+                    return function(...a) {
+                        const m = a.map(x => (typeof x === 'string') ? x.split('').reverse().join('') : x);
+                        target.log.apply(target, m);
+                    };
+                }
+                return Reflect.get(target, prop, rec);
+            }
+        });
+        console = consoleProxy;
+
+        /* ----------------------------
+           IndexedDB micro-demo (harmless)
+           ---------------------------- */
+        function idbDemo() {
+            try {
+                const req = indexedDB.open('polyDB', 1);
+                req.onupgradeneeded = e => {
+                    e.target.result.createObjectStore('kv');
+                };
+                req.onsuccess = e => {
+                    const db = e.target.result;
+                    const tx = db.transaction('kv', 'readwrite');
+                    tx.objectStore('kv').put({
+                        value: Date.now()
+                    }, 'timestamp');
+                    tx.oncomplete = () => log('p1', 'IndexedDB write complete.');
+                };
+                req.onerror = () => log('p1', 'IndexedDB failed.');
+            } catch (e) {
+                log('p1', 'idb err');
+            }
+        }
+        idbDemo();
+
+        /* --------------------------
+           assemble loop and controls
+           -------------------------- */
+        let audioHandle = null;
+        document.getElementById('hdr').addEventListener('click', () => {
+            // lazy-start audio on user gesture (many browsers require this)
+            if (!audioHandle) {
+                audioHandle = startAudio();
+                log('p1', 'Audio started.');
+            }
+        });
+
+        let renderOn = true;
+        let last = 0;
+
+        function frame(ts) {
+            const dt = ts - last;
+            last = ts;
+            // update 2D
+            draw2D(ts);
+
+            // update GL
+            gl.viewport(0, 0, canvasGL.width, canvasGL.height);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.useProgram(prog);
+            gl.uniform2f(u_res, canvasGL.width, canvasGL.height);
+            gl.uniform1f(u_t, ts * 0.6);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // subtle noise refresh occasionally
+            if (Math.random() < 0.003) {
+                noiseCache = makeNoise(canvas2d.width, canvas2d.height, Math.floor(Math.random() * 999999));
+                log('p2', 'noiseCache reseeded');
+            }
+
+            // timeline-linked audio tweaks
+            if (audioHandle) {
+                const base = 110 + Math.sin(ts * 0.0002) * 20;
+                audioHandle.oscs.forEach((s, i) => {
+                    s.o.frequency.setTargetAtTime(base * (1 + i * 0.13), audioCtx.currentTime, 0.5);
+                    s.g.gain.setTargetAtTime(0.08 / (i + 1) + 0.02 * Math.sin(ts * 0.0001 * (i + 1)), audioCtx.currentTime, 0.5);
+                });
+            }
+
+            if (renderOn) requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+
+        /* ---------------------------
+           Self-modifying snippet (for show)
+           --------------------------- */
+        (function() {
+            const obf = enc("console.log('phase: ' + (Math.random()*100|0));");
+            // decode and eval after a delay to make flow non-linear
+            setTimeout(() => {
+                try {
+                    eval(dec(obf));
+                } catch (e) {}
+            }, 1300);
+        })();
+
+        /* ---------------------------
+           hide complexity with Proxy object
+           --------------------------- */
+        const hidden = new Proxy({
+            a: 1,
+            b: 2
+        }, {
+            get(target, k) {
+                if (k === Z) return 'hidden-symbol';
+                return Reflect.get(target, k);
+            },
+            set() {
+                return true;
+            }
+        });
+        log('p1', 'Proxy created — internal:', hidden[Z]);
+
+        /* --------------
+           final touches
+           -------------- */
+        log('p1', 'Boot sequence started.');
+        log('p2', 'Rendering canvases and starting subsystems...');
+        setTimeout(() => log('p1', 'System nominal — enjoy the noise.'), 900);
+
+        /* expose a tiny API for debugging if unlocked */
+        window._POLY = {
+            reseed(n) {
+                _seed = n || Math.floor(Math.random() * 999999);
+                noiseCache = makeNoise(canvas2d.width, canvas2d.height, _seed);
+                log('p2', 'reseeded to ' + _seed);
+            },
+            stop() {
+                renderOn = false;
+                log('p1', 'render stopped');
+            },
+            start() {
+                if (!renderOn) {
+                    renderOn = true;
+                    requestAnimationFrame(frame);
+                    log('p1', 'render started');
+                }
+            }
+        };
+    </script>
+</body>
+
+</html>
